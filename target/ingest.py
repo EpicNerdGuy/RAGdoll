@@ -5,10 +5,13 @@ from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from sentence_transformers import SentenceTransformer
 from config import CHUNK_SIZE, CHUNK_OVERLAP, EMBEDDING_MODEL, VECTORSTORE_PATH
+import shutil, os
+
+if os.path.exists(VECTORSTORE_PATH):
+    shutil.rmtree(VECTORSTORE_PATH)
 
 loader = TextLoader("target/docs/clean/steins_gate_summary.txt", encoding="utf-8")
 documents = loader.load()
-
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size = CHUNK_SIZE,
     chunk_overlap = CHUNK_OVERLAP

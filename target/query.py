@@ -36,9 +36,27 @@ def ask(question):
     return qa_chain.invoke({"input": question})
 
 if __name__ == "__main__":
-    question = input("Enter your question: ")
-    answer = ask(question)
-    print(answer)
+    qa_chain = build_chain()
+
+    print("=" * 60)
+    print("  RAGdoll Query Interface")
+    print("=" * 60)
+
+    while True:
+        question = input("\nYou: ").strip()
+        if question.lower() in ("quit", "exit", "q"):
+            print("\nExiting RAGdoll.")
+            break
+        if not question:
+            continue
+
+        result = qa_chain.invoke({"input": question})
+
+        print("\n" + "-" * 60)
+        print(f"Question : {question}")
+        print("-" * 60)
+        print(f"Answer   : {result['answer']}")
+        print("-" * 60)
     
 
 
