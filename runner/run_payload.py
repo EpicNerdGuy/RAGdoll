@@ -10,17 +10,35 @@ RESULTS_DIR = Path(__file__).parent.parent / "results"
 RESULTS_DIR.mkdir(exist_ok=True)
 
 def parse_payload_md(path: Path):
-    text = path.read_text(encoding="utf-8")
+    text = path.read_text(encoding="utf-8").replace("\r\n", "\n")
     match = re.match(r"^---\n(.*?)\n---\n(.*)$", text, re.DOTALL)
     if not match:
+        print(f"  [debug] {path.name}: no frontmatter match")
         return None
+
     frontmatter = yaml.safe_load(match.group(1))
     body = match.group(2)
 
-    payload_match = re.search(r"## Payload\s*```\s*(.*?)\s*```", body, re.DOTALL)
-    if not payload_match:
+    # Grab everything between "## Payload" and the next "## " heading (or end of file)
+    section_match = re.search(r"## Payload\s*\n(.*?)(?=\n## |\Z)", body, re.DOTALL)
+    if not section_match:
+        print(f"  [debug] {path.name}: no ## Payload section found")
         return None
-    frontmatter["payload_text"] = payload_match.group(1).strip()
+
+    raw_section = section_match.group(1).strip()
+
+    # If it's fenced with triple backticks, strip the fences
+    fenced = re.match(r"^```(?:\w*)\n(.*?)\n```$", raw_section, re.DOTALL)
+    if fenced:
+        payload_text = fenced.group(1).strip()
+    else:
+        payload_text = raw_section.strip()
+
+    if not payload_text:
+        print(f"  [debug] {path.name}: ## Payload section is empty")
+        return None
+
+    frontmatter["payload_text"] = payload_text
     frontmatter["source_file"] = str(path.relative_to(PAYLOAD_ROOT))
     return frontmatter
 

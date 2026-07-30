@@ -1,4 +1,4 @@
-from langchain_community.document_loaders import TextLoader
+from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
@@ -10,7 +10,12 @@ import shutil, os
 if os.path.exists(VECTORSTORE_PATH):
     shutil.rmtree(VECTORSTORE_PATH)
 
-loader = TextLoader("target/docs/clean/steins_gate_summary.txt", encoding="utf-8")
+loader = DirectoryLoader(
+    "target/docs",
+    glob="**/*.txt",
+    loader_cls=TextLoader,
+    loader_kwargs={"encoding": "utf-8"}
+)
 documents = loader.load()
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size = CHUNK_SIZE,

@@ -31,8 +31,7 @@ def build_chain():
 
     return rag_chain
 
-def ask(question):
-    qa_chain = build_chain()
+def ask(qa_chain, question):
     return qa_chain.invoke({"input": question})
 
 if __name__ == "__main__":
