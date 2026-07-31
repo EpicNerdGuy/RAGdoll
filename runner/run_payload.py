@@ -19,7 +19,6 @@ def parse_payload_md(path: Path):
     frontmatter = yaml.safe_load(match.group(1))
     body = match.group(2)
 
-    # Grab everything between "## Payload" and the next "## " heading (or end of file)
     section_match = re.search(r"## Payload\s*\n(.*?)(?=\n## |\Z)", body, re.DOTALL)
     if not section_match:
         print(f"  [debug] {path.name}: no ## Payload section found")
@@ -27,7 +26,6 @@ def parse_payload_md(path: Path):
 
     raw_section = section_match.group(1).strip()
 
-    # If it's fenced with triple backticks, strip the fences
     fenced = re.match(r"^```(?:\w*)\n(.*?)\n```$", raw_section, re.DOTALL)
     if fenced:
         payload_text = fenced.group(1).strip()
@@ -42,9 +40,19 @@ def parse_payload_md(path: Path):
     frontmatter["source_file"] = str(path.relative_to(PAYLOAD_ROOT))
     return frontmatter
 
-def score(response_text: str, success_markers: list):
-    hit = [m for m in success_markers if m.lower() in response_text.lower()]
-    return "SUCCESS" if hit else "BLOCKED", hit
+def score(response_text: str, success_markers: list, partial_markers: list = None):
+    text_lower = response_text.lower()
+    hit_success = [m for m in success_markers if m.lower() in text_lower]
+    hit_partial = [m for m in (partial_markers or []) if m.lower() in text_lower]
+
+    if hit_success and hit_partial:
+        return "PARTIAL", hit_success + hit_partial
+    elif hit_success:
+        return "SUCCESS", hit_success
+    elif hit_partial:
+        return "BLOCKED", hit_partial
+    else:
+        return "UNKNOWN", []
 
 def run_all():
     qa_chain = build_chain()
@@ -64,7 +72,11 @@ def run_all():
         except Exception as e:
             answer = f"[ERROR] {e}"
 
-        verdict, hits = score(answer, parsed.get("success_markers", []))
+        verdict, hits = score(
+            answer,
+            parsed.get("success_markers", []),
+            parsed.get("partial_markers", [])
+        )
 
         results.append({
             "id": parsed["id"],
@@ -84,12 +96,10 @@ def run_all():
     print(f"\nDone. {len(results)} payloads run. See results/payload-log.md")
 
 def write_json(results):
-    path = RESULTS_DIR / "payload-log.json"
-    existing = []
-    if path.exists():
-        existing = json.loads(path.read_text(encoding="utf-8"))
-    existing.extend(results)
-    path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+    path = RESULTS_DIR / "payload-log.jsonl"
+    with open(path, "a", encoding="utf-8") as f:
+        for r in results:
+            f.write(json.dumps(r) + "\n")
 
 def write_md(results):
     path = RESULTS_DIR / "payload-log.md"
