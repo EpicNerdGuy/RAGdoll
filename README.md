@@ -1,14 +1,9 @@
 # RAGdoll
 
-Give an LLM a cheat sheet and it'll read it. Give it a poisoned one and it'll follow it.
+RAGdoll is a local RAG pipeline built for one purpose: getting attacked by its own creator. It stands up a working LangChain RAG stack over a hardcoded Steins;Gate wiki PDF, then systematically breaks it through prompt injection and system prompt extraction, logging every payload into a reusable library along the way.
 
-RAGdoll is a local RAG pipeline built for one purpose: getting attacked by its own creator. It stands up a working LangChain RAG stack, then systematically breaks it through indirect prompt injection and system prompt extraction, logging every payload into a reusable library along the way.
+Current status: 7 direct prompt injection payloads landed. Indirect prompt injection payloads coming soon.
 
-## Why this exists
-
-An LLM has no ring 0. There is no hardware boundary between "instructions I should obey" and "content I should summarize." It's all tokens in the same buffer, and the model has to guess which parts are commands based on nothing but phrasing and position.
-
-RAG makes this worse, not better. It hands the model a live feed of external, often untrusted, text and asks it to treat that text as reference material. RAGdoll exists to find out exactly how much you can abuse that trust before the model breaks character.
 
 ## What it actually does
 
@@ -18,49 +13,55 @@ RAG makes this worse, not better. It hands the model a live feed of external, of
 4. Gets attacked again, directly, with prompts designed to leak its own system prompt
 5. Logs every attempt, working or not, into a structured payload library
 
-<img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/6bb40158-9daa-40d6-91d2-929bfc8f2411" />
+<img width="1109" height="297" alt="image" src="https://github.com/user-attachments/assets/be2c9d09-6ed6-4b98-a8ee-439c44e79b7f" />
 
 
 ## Project structure
 
 ```
 RAGdoll/
-├── target/              the RAG app itself, the thing under test
-│   ├── ingest.py         builds the vector store from docs
-│   ├── query.py          the live pipeline, retrieval plus LLM call
-│   ├── config.py         every tunable constant in one place
-│   └── docs/
-│       ├── clean/         control group, proves the pipeline works
-│       └── poisoned/      live fire range, one payload at a time
+├── .vscode/
 │
-├── payloads/             the permanent payload library
-│   ├── indirect-injection/
-│   │   ├── tier1-direct-override/
-│   │   ├── tier2-role-confusion/
-│   │   ├── tier3-exfiltration/
-│   │   ├── tier4-placement/
-│   │   └── tier5-chaining/
-│   └── system-prompt-extraction/
-│       ├── role-confusion/
-│       ├── completion-attack/
-│       ├── translation-bypass/
-│       ├── documentation-framing/
-│       └── multi-turn-erosion/
+├── payloads/                         permanent payload library
+│   ├── direct-injection/
+│   │   ├── direct-01-instr-override.md
+│   │   ├── direct-02-role-hijack.md
+│   │   ├── direct-03-fake-delimiter.md
+│   │   ├── direct-04-encoding-smuggle.md
+│   │   ├── direct-05-prefix-priming.md
+│   │   ├── direct-06-authority-impersonation.md
+│   │   └── direct-07-hypothetical-distancing.md
+│   └── indirect-injection/
+│       └── tier1-direct-override/
+│           └── basic.md
 │
-├── runner/               automation for running payloads at scale
-│   ├── run_payload.py
-│   ├── batch_run.py
-│   └── compare_models.py
-│
-├── results/              the actual dataset
+├── results/                          the actual dataset
+│   ├── payload-log.json
+│   ├── payload-log.jsonl
 │   ├── payload-log.md
-│   └── payload-log.json
+│   ├── payload-report.html
+│   └── payload-report.md
 │
-├── vectorstore/          Chroma persistence, gitignored
+├── runner/                           automation for running payloads
+│   ├── render_report.py
+│   ├── render_report_html.py
+│   └── run_payload.py
 │
-└── writeup/              the research narrative
-    ├── methodology.md
-    └── owasp-mapping.md
+└── target/                           the RAG app itself, the thing under test
+    ├── docs/
+    │   ├── clean/                    control group, proves the pipeline works
+    │   │   ├── steins_gate_summary.txt
+    │   │   └── Steins;Gate_(TV_series).pdf
+    │   └── poisoned/                 live fire range, one payload at a time
+    │       └── steins;gate_poisoned.txt
+    ├── vectorstore/chroma_db/        Chroma persistence, gitignored
+    ├── config.py                     every tunable constant in one place
+    ├── ingest.py                     builds the vector store from docs
+    ├── query.py                      the live pipeline, retrieval plus LLM call
+    ├── .env.example
+    ├── .gitignore
+    ├── README.md
+    └── requirements.txt
 ```
 
 ## Setup
@@ -74,7 +75,7 @@ pip install -r requirements.txt
 Pull a local model through Ollama. Small models work fine here, this project isn't about reasoning ability, it's about instruction hierarchy discipline, and a smaller model is arguably a more interesting target since it has less capacity to resist getting talked into things.
 
 ```bash
-ollama pull llama3.2:3b
+ollama pull llama3.2:1b
 ```
 
 ## Usage
@@ -94,34 +95,41 @@ python target/query.py
 Run a single payload:
 
 ```bash
-python runner/run_payload.py payloads/indirect-injection/tier1-direct-override/basic.md
+python runner/run_payload.py payloads/direct-injection/direct-01-instr-override.md
 ```
 
-Run the whole library and log results:
+Run the whole batch of direct prompt injection payloads:
 
 ```bash
-python runner/batch_run.py
+python runner/run_payload.py
 ```
 
-Compare behavior across models:
-
+Save it as a html report
 ```bash
-python runner/compare_models.py
+python runner/render_report_html.py
 ```
+
+
+https://github.com/user-attachments/assets/2b1d15e7-3ce0-4a50-8934-f5d8feb1548f
+
+
+
 
 ## Attack categories
 
-### Indirect prompt injection
+### Direct prompt injection
+<img width="1512" height="537" alt="image" src="https://github.com/user-attachments/assets/2ce03153-8e55-4f56-850f-7141deed8da9" />
 
-The document route. Instructions get planted inside otherwise normal looking content, ingested like any other document, and retrieved into the model's context as trusted data. Tested across five tiers, from a blunt "ignore previous instructions" to multi-document payload chaining.
+The query route. The payload rides in as the attacker's own input, no documents involved, sent straight into the pipeline and aimed at overriding the model's behavior in that turn. Seven payloads tested so far: instruction override, role hijack, fake delimiter, encoding smuggle, prefix priming, authority impersonation, and hypothetical distancing.
+
+### Indirect prompt injection (Adding Soon)
+The document route. Instructions get planted inside otherwise normal looking content, ingested like any other document, and retrieved into the model's context as trusted data. Tiered from a blunt "ignore previous instructions" up through multi-document payload chaining. Tier 1 is in progress, tiers 2 through 5 coming soon.
 
 ### System prompt extraction
-
-The direct route. No documents involved, these go straight into the query input. Role confusion, completion attacks, translation bypasses, and multi-turn erosion, all aimed at getting the model to hand over its own instructions.
+A specific goal rather than a delivery route, aimed at getting the model to hand over its own instructions rather than just override its behavior. Role confusion, completion attacks, translation bypasses, and multi-turn erosion. Coming soon.
 
 ## The payload library
-
-Every payload gets logged with its injection vector, the model it was tested against, the result, and a short hypothesis for why it worked or got blocked. Full log lives in `results/payload-log.md`. Categories are mapped to the OWASP LLM Top 10 in `writeup/owasp-mapping.md`, mostly LLM01.
+Every payload gets logged with its injection vector, the model it was tested against, the result, and a short hypothesis for why it worked or got blocked. Full log lives in `results/payload-log.md`. Categories will be mapped to the OWASP LLM Top 10, mostly LLM01, once the writeup lands.
 
 ## Disclaimer
 
